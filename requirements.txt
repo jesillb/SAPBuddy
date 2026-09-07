@@ -1,0 +1,6 @@
+streamlit>=1.38,<2
+anthropic>=0.40,<1
+requests>=2.31
+pandas>=2.0
+jsonschema>=4.20
+pytest>=8.0

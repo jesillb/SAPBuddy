@@ -1,0 +1,176 @@
+{
+  "type": "object",
+  "properties": {
+    "domain": {
+      "type": "string",
+      "description": "Best-guess primary website domain, e.g. example.com. Empty string if unknown."
+    },
+    "hq_city": {
+      "type": "string",
+      "description": "Headquarters city. Empty string if unknown."
+    },
+    "hq_country": {
+      "type": "string",
+      "description": "Headquarters country. Empty string if unknown."
+    },
+    "other_sites": {
+      "type": "array",
+      "description": "Other known offices, plants, or operating sites.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "city": {"type": "string"},
+          "country": {"type": "string"},
+          "type": {"type": "string", "description": "e.g. office, plant, shared service center"}
+        },
+        "required": ["city", "country", "type"],
+        "additionalProperties": false
+      }
+    },
+    "industry": {
+      "type": "string",
+      "description": "Short free-text industry label, e.g. 'District heating utility'."
+    },
+    "industry_category": {
+      "type": "string",
+      "enum": [
+        "telco",
+        "utilities_energy",
+        "media_streaming",
+        "transport_mobility",
+        "saas_tech_subscription",
+        "manufacturing_industrial_service",
+        "other"
+      ],
+      "description": "Bucket used by the BRIM scoring formula. Pick the closest fit."
+    },
+    "employee_range": {
+      "type": "string",
+      "enum": ["5000+", "1000-4999", "250-999", "<250", "unknown"],
+      "description": "Best estimate of headcount bucket."
+    },
+    "revenue_range_eur": {
+      "type": "string",
+      "description": "Best estimate of annual revenue, e.g. '100M-500M EUR'. Empty string if unknown."
+    },
+    "sap_status": {
+      "type": "string",
+      "enum": ["unknown", "likely_sap", "confirmed_sap", "s4hana", "ecc"],
+      "description": "Overall confidence/state of SAP usage. Use 's4hana' only when there is direct evidence of S/4HANA (go-live, case study, job posts naming S/4HANA)."
+    },
+    "sap_signals": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Short evidence strings backing the sap_status/module inference, e.g. 'Job post for SAP S/4HANA Basis Consultant, posted 2026-06'."
+    },
+    "likely_modules": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Likely SAP modules in use, e.g. ['S/4HANA', 'FI-CA', 'BRIM SOM']."
+    },
+    "module_confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Confidence in the likely_modules inference."
+    },
+    "brim_components_likely": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["SOM", "CC", "CI", "FI-CA", "RAR", "Subscription Billing"]
+      },
+      "description": "Which BRIM/RAR components this company most plausibly needs or runs."
+    },
+    "brim_evidence": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Quoted snippets or URLs supporting the BRIM/RAR fit assessment."
+    },
+    "brim_evidence_flags": {
+      "type": "object",
+      "description": "Booleans feeding the numeric BRIM score. Set true only with real supporting evidence in the source content.",
+      "properties": {
+        "mentions_brim_or_hybris": {"type": "boolean", "description": "Direct mention of SAP BRIM, Hybris Billing, or Subscription Billing."},
+        "mentions_rar": {"type": "boolean", "description": "Direct mention of SAP RAR / Revenue Accounting and Reporting."},
+        "mentions_billing_job_postings": {"type": "boolean", "description": "Job posts for high-volume billing, convergent invoicing, or a rating engine."},
+        "mentions_billing_case_study": {"type": "boolean", "description": "A case study or press release about a billing/revenue transformation."},
+        "strong_subscription_usage_model": {"type": "boolean", "description": "The business model is clearly subscription- or usage-based at volume."}
+      },
+      "required": [
+        "mentions_brim_or_hybris",
+        "mentions_rar",
+        "mentions_billing_job_postings",
+        "mentions_billing_case_study",
+        "strong_subscription_usage_model"
+      ],
+      "additionalProperties": false
+    },
+    "fit_rationale": {
+      "type": "string",
+      "description": "2-3 sentence qualitative summary of why (or why not) this company needs SAP BRIM/RAR talent, for a recruiter audience."
+    },
+    "recent_events": {
+      "type": "array",
+      "description": "3-5 recent, relevant events: S/4HANA moves, billing/revenue programmes, e-invoicing, funding, M&A.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string"},
+          "source": {"type": "string"},
+          "date": {"type": "string", "description": "ISO date (YYYY-MM-DD) if known, else empty string."},
+          "url": {"type": "string"},
+          "summary": {"type": "string"},
+          "themes": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "e.g. ['s4hana', 'billing', 'e-invoicing', 'revenue']"
+          }
+        },
+        "required": ["title", "source", "date", "url", "summary", "themes"],
+        "additionalProperties": false
+      }
+    },
+    "s4_migration_status": {
+      "type": "string",
+      "enum": ["unknown", "planned", "in_flight", "completed"]
+    },
+    "einvoicing_pressure": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "How much near-term pressure this company faces from e-invoicing mandates (e.g. Belgium B2B Peppol mandate from 1 Jan 2026)."
+    },
+    "recommended_action": {
+      "type": "string",
+      "description": "One sentence: what should the recruiter do about this account this week?"
+    },
+    "outreach_angles": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "3-5 short, specific outreach angles/hooks a recruiter could use, tied to this company's actual signals."
+    }
+  },
+  "required": [
+    "domain",
+    "hq_city",
+    "hq_country",
+    "other_sites",
+    "industry",
+    "industry_category",
+    "employee_range",
+    "revenue_range_eur",
+    "sap_status",
+    "sap_signals",
+    "likely_modules",
+    "module_confidence",
+    "brim_components_likely",
+    "brim_evidence",
+    "brim_evidence_flags",
+    "fit_rationale",
+    "recent_events",
+    "s4_migration_status",
+    "einvoicing_pressure",
+    "recommended_action",
+    "outreach_angles"
+  ],
+  "additionalProperties": false
+}

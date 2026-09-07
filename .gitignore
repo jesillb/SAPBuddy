@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.db
+*.sqlite3
+data/*.csv
+!data/sample_companies.csv
+.streamlit/secrets.toml
+.env
+.env.*
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/

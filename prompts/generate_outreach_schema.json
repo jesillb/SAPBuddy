@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "linkedin_message": {
+      "type": "string",
+      "description": "A short LinkedIn connection/InMail message (under ~600 characters), specific to this company's BRIM/RAR signals."
+    },
+    "email": {
+      "type": "string",
+      "description": "A medium-length outreach email (100-180 words) with a subject line included as the first line, prefixed 'Subject: '."
+    },
+    "call_opener_bullets": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Exactly 3 short bullets a recruiter can glance at during a cold call opener.",
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "required": ["linkedin_message", "email", "call_opener_bullets"],
+  "additionalProperties": false
+}
