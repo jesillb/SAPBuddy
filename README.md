@@ -17,23 +17,24 @@ not ground truth.
 - **Python 3.11+**
 - **Streamlit** - the whole UI (`app/main.py` + `app/pages/`)
 - **SQLite** - single file DB, plain `sqlite3` (no ORM), schema in `db/database.py`
-- **Anthropic Claude API** - structured JSON-schema outputs for enrichment and outreach copy
-- **requests** - web search calls (optional, stubbed if unconfigured)
+- **Anthropic Claude API** - structured JSON-schema outputs, plus Claude's
+  built-in `web_search` tool for real, current research on each company
 
 ## Required environment variables
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes, for enrichment | Claude API key. The app runs and browses without it; enrichment/outreach calls fail with a clear message until it's set. |
-| `SEARCH_API_KEY` | No | Key for an optional web search API used to gather raw content before calling Claude. |
-| `SEARCH_API_ENDPOINT` | No | Endpoint for that search API. Expected to accept `?q=<query>&key=<key>` and return `{"results": [{"title", "snippet", "url"}]}`. Adjust `enrichment/web_search.py::_call_search_api` if your provider's shape differs. |
+| `ANTHROPIC_API_KEY` | Yes, for enrichment | Claude API key. Also what enables live web search - no separate search API/key needed. The app runs and browses without it; enrichment/outreach calls fail with a clear message until it's set. |
 | `SAPBUDDY_CLAUDE_MODEL` | No | Overrides the Claude model used for enrichment/outreach calls. Defaults to `claude-opus-5`. |
-| `SAPBUDDY_CLAUDE_MAX_TOKENS` | No | Max output tokens per Claude call. Defaults to `8000`. |
+| `SAPBUDDY_CLAUDE_MAX_TOKENS` | No | Max output tokens per Claude call. Defaults to `12000` (enrichment calls do several web searches before answering, so they need more headroom than a plain completion). |
+| `SAPBUDDY_WEB_SEARCH_MAX_USES` | No | Caps how many searches Claude can run per company during enrichment. Defaults to `5`. Each search is billed separately from tokens - see [Anthropic's web search pricing](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool) - so this is also a per-company cost cap. |
 | `SAPBUDDY_DB_PATH` | No | Overrides the SQLite file path. Defaults to `data/sapbuddy.db`. |
 
-Without `SEARCH_API_KEY`/`SEARCH_API_ENDPOINT`, enrichment still runs: Claude
-gets a stub note instead of live search results and will mark most fields as
-unknown rather than guess. Wire up a real search API for useful results.
+Enrichment now always uses Claude's server-side `web_search` tool (no local
+search API to configure) - Claude runs its own searches, reads real results,
+and only marks a field "unknown" when search genuinely turns up nothing. It
+runs automatically as part of the same API call as the structured output, so
+there's no separate search step in the code.
 
 ## Install
 
@@ -59,17 +60,16 @@ flow immediately.
 1. **Import** - upload a CSV with `company_name` (required), `website`/`domain`,
    `country`, `tags` (comma-separated). Rows are upserted into the `companies`
    table, matched on name+domain.
-2. **Enrich** - for each company, `enrichment/enrich_company.py`:
-   - Gathers raw web content (`enrichment/web_search.py` - real search if
-     configured, else a stub).
-   - Calls Claude with `prompts/enrich_company_prompt.md` and
-     `prompts/enrich_company_schema.json` via the API's structured-output
-     mode (`output_config.format: json_schema`), so the response is
-     guaranteed to match the schema - no manual JSON parsing/repair.
-   - Runs the parsed result through the deterministic Python scoring
-     function (`scoring/brim_score.py`) to get `brim_score` and
-     `priority_tier`.
-   - Persists everything to the `companies` row.
+2. **Enrich** - for each company, `enrichment/enrich_company.py` calls
+   Claude once with `prompts/enrich_company_prompt.md`, Anthropic's
+   server-side `web_search` tool enabled, and
+   `prompts/enrich_company_schema.json` as the structured-output schema
+   (`output_config.format: json_schema`). Claude runs its own searches,
+   reads the results, and its final answer is guaranteed to match the
+   schema - no manual JSON parsing/repair, and no local search step to
+   maintain. The parsed result is then run through the deterministic
+   Python scoring function (`scoring/brim_score.py`) to get `brim_score`
+   and `priority_tier`, and everything is persisted to the `companies` row.
 3. **Dashboard** (`app/main.py`) - filter by country, industry, priority
    tier, score range, S/4 migration status, e-invoicing pressure. Select a
    row to open its dossier. Export the filtered list as CSV.
@@ -129,11 +129,12 @@ sample Claude-shaped responses against the JSON schemas (plus that
 - Public data only - no paid SAP installed-base feed. Treat `sap_status`,
   `likely_modules`, and `brim_score` as leads to qualify, not confirmed
   facts.
-- Without a configured search API, enrichment runs on a stub and will
-  mostly return "unknown" fields - it will not hallucinate signals it
-  wasn't given.
-- Web search API integration in `enrichment/web_search.py` assumes a
-  generic `{"results": [...]}` JSON shape; adapt it to your provider.
+- Web search quality depends on what's actually indexed and findable - a
+  company with a quiet public footprint will still come back mostly
+  "unknown" rather than hallucinated. Always sanity-check `brim_evidence`
+  and `recent_events` links before using them in outreach.
+- Each enrichment call runs up to `SAPBUDDY_WEB_SEARCH_MAX_USES` searches,
+  billed separately from tokens - budget accordingly for large imports.
 - CSV import matches on name+domain for upserts; near-duplicate company
   names (e.g. "Proximus" vs "Proximus NV") will create separate rows.
 - Enrichment in the UI runs synchronously, one company at a time - fine for

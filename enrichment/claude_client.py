@@ -12,7 +12,17 @@ from functools import lru_cache
 import anthropic
 
 DEFAULT_MODEL = os.environ.get("SAPBUDDY_CLAUDE_MODEL", "claude-opus-5")
-DEFAULT_MAX_TOKENS = int(os.environ.get("SAPBUDDY_CLAUDE_MAX_TOKENS", "8000"))
+DEFAULT_MAX_TOKENS = int(os.environ.get("SAPBUDDY_CLAUDE_MAX_TOKENS", "12000"))
+WEB_SEARCH_MAX_USES = int(os.environ.get("SAPBUDDY_WEB_SEARCH_MAX_USES", "5"))
+
+# Anthropic-hosted web search - runs server-side inside a single API call
+# (Claude issues its own queries and reads results; no client-side loop
+# needed). See enrichment/enrich_company.py for how this is used.
+WEB_SEARCH_TOOL = {
+    "type": "web_search_20260209",
+    "name": "web_search",
+    "max_uses": WEB_SEARCH_MAX_USES,
+}
 
 
 class ClaudeNotConfiguredError(RuntimeError):
@@ -34,14 +44,24 @@ def call_structured(
     json_schema: dict,
     model: str | None = None,
     max_tokens: int | None = None,
+    tools: list[dict] | None = None,
 ) -> dict:
     """Call Claude and return a dict validated against json_schema.
+
+    If `tools` includes a server-side tool (e.g. WEB_SEARCH_TOOL), Claude
+    runs it automatically within this same call - the response's content
+    ends with a text block matching json_schema, preceded by whatever
+    server_tool_use/tool_result blocks it took to get there.
 
     Raises ClaudeNotConfiguredError if no API key is set, and ValueError if
     Claude's response cannot be parsed as JSON (should not happen with
     output_config.format, but we guard defensively).
     """
     client = _client()
+    kwargs = {}
+    if tools:
+        kwargs["tools"] = tools
+
     response = client.messages.create(
         model=model or DEFAULT_MODEL,
         max_tokens=max_tokens or DEFAULT_MAX_TOKENS,
@@ -53,6 +73,7 @@ def call_structured(
                 "schema": json_schema,
             }
         },
+        **kwargs,
     )
 
     text = next((b.text for b in response.content if b.type == "text"), None)
